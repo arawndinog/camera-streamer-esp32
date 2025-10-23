@@ -1,0 +1,6 @@
+## IDF Component Manager Manifest File
+dependencies:
+  idf: '>=5.0'
+  usb_host_uvc: ^2.3.0
+  espressif/esp_wifi_remote: '*'
+  # espressif/esp_hosted: '*'
