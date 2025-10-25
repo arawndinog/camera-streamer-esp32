@@ -16,8 +16,8 @@ static bool ap_connected = false;
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
 
-#define EXAMPLE_ESP_WIFI_SSID      "Owl Nest"
-#define EXAMPLE_ESP_WIFI_PASS      "maumaus0cute"
+#define EXAMPLE_ESP_WIFI_SSID      "XXXX"
+#define EXAMPLE_ESP_WIFI_PASS      "XXXX"
 #define EXAMPLE_ESP_MAXIMUM_RETRY  5
 
 static void event_handler(void *arg, esp_event_base_t event_base,
@@ -45,8 +45,11 @@ static void event_handler(void *arg, esp_event_base_t event_base,
         ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
-        init_connection_done = true; 
-        xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
+        ap_connected = true;
+        init_connection_done = true;
+        if (wifi_event_group != NULL) {
+            xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
+        }
     }
 }
 
@@ -104,10 +107,8 @@ static void wifi_init()
      * happened. */
     if (bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG, "Connected to ap");
-        ap_connected = true;
     } else if (bits & WIFI_FAIL_BIT) {
         ESP_LOGI(TAG, "Failed to connect to ap");
-        ap_connected = false;
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
         ap_connected = false;
@@ -125,7 +126,7 @@ esp_err_t app_wifi_init(void)
     ESP_ERROR_CHECK(ret);
 
 	wifi_init();
-    return ESP_OK;
+    return ap_connected ? ESP_OK : ESP_FAIL;
 }
 
 bool app_wifi_is_connected(void)
