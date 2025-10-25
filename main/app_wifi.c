@@ -10,6 +10,8 @@
 static const char *TAG = "app_wifi";
 static EventGroupHandle_t wifi_event_group;
 static int s_retry_num = 0;
+static bool init_connection_done = false;
+static bool ap_connected = false;
 
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
@@ -25,18 +27,25 @@ static void event_handler(void *arg, esp_event_base_t event_base,
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (s_retry_num < EXAMPLE_ESP_MAXIMUM_RETRY) {
-            esp_wifi_connect();
-            s_retry_num++;
-            ESP_LOGI(TAG, "retry to connect to the AP");
+        ap_connected = false;
+        if (!init_connection_done) {  
+            if (s_retry_num < EXAMPLE_ESP_MAXIMUM_RETRY) {
+                esp_wifi_connect();
+                s_retry_num++;
+                ESP_LOGI(TAG, "retry to connect to the AP");
+            } else {
+                xEventGroupSetBits(wifi_event_group, WIFI_FAIL_BIT);
+                ESP_LOGI(TAG, "connect to the AP failed");
+            }
         } else {
-            xEventGroupSetBits(wifi_event_group, WIFI_FAIL_BIT);
+            esp_wifi_connect();
+            ESP_LOGI(TAG, "Disconnected from AP, attempting reconnection...");
         }
-        ESP_LOGI(TAG, "connect to the AP fail");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
+        init_connection_done = true; 
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
@@ -95,20 +104,18 @@ static void wifi_init()
      * happened. */
     if (bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG, "Connected to ap");
+        ap_connected = true;
     } else if (bits & WIFI_FAIL_BIT) {
         ESP_LOGI(TAG, "Failed to connect to ap");
+        ap_connected = false;
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
+        ap_connected = false;
     }
-
-    /* The event will not be processed after unregister */
-    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, got_ip_event_instance));
-    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, got_id_event_instance));
-    vEventGroupDelete(wifi_event_group);
 }
 
 
-void app_wifi_init(void)
+esp_err_t app_wifi_init(void)
 {
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -118,4 +125,10 @@ void app_wifi_init(void)
     ESP_ERROR_CHECK(ret);
 
 	wifi_init();
+    return ESP_OK;
+}
+
+bool app_wifi_is_connected(void)
+{
+    return ap_connected;
 }
