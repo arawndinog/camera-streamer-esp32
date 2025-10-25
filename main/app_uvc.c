@@ -40,7 +40,7 @@ static const uvc_host_stream_config_t stream_config = {
     .vs_format = {
         .h_res = 1920,
         .v_res = 1080,
-        .fps = 30,
+        .fps = 20,
         .format = UVC_VS_FORMAT_MJPEG,
     },
     .advanced = {

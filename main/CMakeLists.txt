@@ -1,4 +1,14 @@
-idf_component_register(SRCS "app_streaming.c" "app_main.c" "app_uvc.c"
-                    PRIV_REQUIRES
-                        esp_psram    # Required for CONFIG_SPIRAM
-                    )
+idf_component_register(
+    SRCS 
+        "app_wifi.c"
+        "app_uvc.c"
+        "app_streaming.c"
+        "app_main.c"
+    INCLUDE_DIRS "."
+    REQUIRES
+        esp_wifi_remote
+        esp_wifi
+        nvs_flash
+    PRIV_REQUIRES
+        esp_psram
+)
