@@ -13,7 +13,7 @@ extern "C" {
  * 
  * @return ESP_OK on success, ESP_FAIL otherwise
  */
-esp_err_t app_streaming_init(void);
+esp_err_t app_http_init(void);
 
 #ifdef __cplusplus
 }

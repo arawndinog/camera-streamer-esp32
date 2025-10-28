@@ -1,8 +1,8 @@
-#include "app_streaming.h"
+#include "app_http.h"
 #include "app_uvc.h"
 #include "esp_log.h"
 
-static const char *TAG = "app_streaming";
+static const char *TAG = "app_http";
 
 /**
  * @brief Frame processing callback
@@ -10,7 +10,7 @@ static const char *TAG = "app_streaming";
  */
 static void process_frame(const uint8_t *data, size_t len, void *user_ctx)
 {
-    ESP_LOGI(TAG, "Frame received - Length: %d bytes", len);
+    // ESP_LOGI(TAG, "Frame received - Length: %d bytes", len);
     
     // TODO: Add your streaming logic here
     // - data points to MJPEG frame
@@ -18,7 +18,7 @@ static void process_frame(const uint8_t *data, size_t len, void *user_ctx)
     // - Process as needed (send over WiFi, save to SD, etc.)
 }
 
-esp_err_t app_streaming_init(void)
+esp_err_t app_http_init(void)
 {
     ESP_LOGI(TAG, "Initializing streaming module");
     
