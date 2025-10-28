@@ -2,6 +2,6 @@
 .vscode
 build/
 managed_components/
+main/archive/
 *sdkconfig*
 !sdkconfig.defaults*
-archive/
