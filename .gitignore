@@ -5,3 +5,4 @@ managed_components/
 main/archive/
 *sdkconfig*
 !sdkconfig.defaults*
+*.code-workspace

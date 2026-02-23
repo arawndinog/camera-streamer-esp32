@@ -169,7 +169,7 @@ esp_err_t app_uvc_init(void)
     ESP_ERROR_CHECK(usb_host_install(&host_config));
     
     // Create a FreeRTOS task that will handle USB library events
-    BaseType_t task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_lib", 4096, NULL, USB_HOST_PRIORITY, NULL, tskNO_AFFINITY);
+    BaseType_t task_created = xTaskCreate(usb_lib_task, "usb_lib", 4096, NULL, USB_HOST_PRIORITY, NULL);
     assert(task_created == pdTRUE);
     
     ESP_LOGI(TAG, "Installing UVC driver");
@@ -181,7 +181,7 @@ esp_err_t app_uvc_init(void)
     };
     ESP_ERROR_CHECK(uvc_host_install(&uvc_driver_config));
     
-    task_created = xTaskCreatePinnedToCore(frame_handling_task, "frame_hdl", 4096, (void *)&stream_config, USB_HOST_PRIORITY - 2, NULL, tskNO_AFFINITY);
+    task_created = xTaskCreate(frame_handling_task, "frame_hdl", 4096, (void *)&stream_config, USB_HOST_PRIORITY - 2, NULL);
     assert(task_created == pdTRUE);
 
     return ESP_OK;
