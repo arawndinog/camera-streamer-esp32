@@ -1,6 +1,6 @@
 dependencies:
   espressif/eppp_link:
-    component_hash: 41f6519edda527ec6a0553c872ebaf8fc6d3812523c9d4c8d1660ad21c720abe
+    component_hash: 9472e6825f4bb71eca2b39cf1bc92659c1ac60bfd7416560ad033a7dd8641b17
     dependencies:
     - name: espressif/esp_serial_slave_link
       registry_url: https://components.espressif.com
@@ -12,9 +12,9 @@ dependencies:
     source:
       registry_url: https://components.espressif.com
       type: service
-    version: 1.1.3
+    version: 1.1.4
   espressif/esp_hosted:
-    component_hash: 66b48cdc7f5a515c175fec253b40d4432ed3678c0a6323b1482131d8cd184d98
+    component_hash: 9eea9ce83444a412b4a02311f787f3639a5d29fe67e6df83863010dd68ab250b
     dependencies:
     - name: idf
       require: private
@@ -22,9 +22,9 @@ dependencies:
     source:
       registry_url: https://components.espressif.com
       type: service
-    version: 2.6.1
+    version: 2.12.0
   espressif/esp_serial_slave_link:
-    component_hash: 7cd3bae703cc6136b578ef521b2f9df3171d029775a3558f0efdb200a3b04f57
+    component_hash: ac1776806de0a6e371c84e87898bb983e19ce62aa7f1e2e5c4a3b0234a575d2c
     dependencies:
     - name: idf
       require: private
@@ -32,7 +32,7 @@ dependencies:
     source:
       registry_url: https://components.espressif.com
       type: service
-    version: 1.1.1~1
+    version: 1.1.2
   espressif/esp_wifi_remote:
     component_hash: 27f0e8786349812eba2129058b71d5b1a31f1c991adf3ea1c0f38ae2de751ccb
     dependencies:
@@ -77,7 +77,7 @@ dependencies:
     - linux
     version: 2.3.1
   espressif/wifi_remote_over_eppp:
-    component_hash: 7afc4161e7746618c52285e8103393c7fab7b3d88e18653e5ccf723f2012f9c2
+    component_hash: ac4d13625cc9f88597cd612d2758580fac287d8ec731b606f2a0720d28cda6cd
     dependencies:
     - name: espressif/eppp_link
       registry_url: https://components.espressif.com
@@ -89,7 +89,7 @@ dependencies:
     source:
       registry_url: https://components.espressif.com
       type: service
-    version: 0.2.0
+    version: 0.3.1
   idf:
     source:
       type: idf

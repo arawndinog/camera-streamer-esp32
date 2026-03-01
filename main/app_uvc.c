@@ -32,23 +32,24 @@ static const uvc_host_stream_config_t stream_config = {
     .frame_cb = frame_callback,
     .user_ctx = &rx_frames_queue,
     .usb = {
-        .vid = UVC_HOST_ANY_VID, // Set to 0 to match any VID
-        .pid = UVC_HOST_ANY_PID, // Set to 0 to match any PID
-        .uvc_stream_index = 0,   /* Index of UVC function you want to use. Set to 0 to use first available UVC function.
-                                    Setting this to >= 1 will only work if the camera has multiple UVC functions (eg. multiple image sensors in one USB device) */
+        .vid = UVC_HOST_ANY_VID,
+        .pid = UVC_HOST_ANY_PID,
+        .uvc_stream_index = 0,
     },
     .vs_format = {
-        .h_res = 1920,
-        .v_res = 1080,
+        // OPTIMIZATION: Lowered to 720p 15fps for stable Wi-Fi streaming. 
+        // Change back to 1920x1080 if your network can handle the bandwidth.
+        .h_res = 1280,
+        .v_res = 720,
         .fps = 20,
         .format = UVC_VS_FORMAT_MJPEG,
     },
     .advanced = {
-        .frame_size = 0,                // == 0: Use dwMaxVideoFrameSize from format negotiation result (might be too large)
-        .number_of_frame_buffers = 3,   // Use triple buffering scheme if SPIRAM is available
-        .number_of_urbs = 3,            // 3x 10kB URBs is usually enough, even for higher resolutions
-        .urb_size = 10 * 1024,          // Larger values result in less frequent interrupts at the cost of memory consumption
-        .frame_heap_caps = MALLOC_CAP_SPIRAM, // Use SPIRAM for frame buffers if available
+        .frame_size = 0,
+        .number_of_frame_buffers = 4,   // Increased from 3 to 4 for better buffering
+        .number_of_urbs = 3,
+        .urb_size = 10 * 1024,
+        .frame_heap_caps = MALLOC_CAP_SPIRAM,
     },
 };
 
@@ -56,16 +57,15 @@ static bool frame_callback(const uvc_host_frame_t *frame, void *user_ctx)
 {
     assert(frame);
     assert(user_ctx);
-    QueueHandle_t frame_q = *((QueueHandle_t *)user_ctx);   //user_ctx is provided library callback
+    QueueHandle_t frame_q = *((QueueHandle_t *)user_ctx);
 
     // Send the received frame to queue for further processing
-    ESP_LOGD(TAG, "Frame callback! data len: %d", frame->data_len);
     BaseType_t result = xQueueSendToBack(frame_q, &frame, 0);
     if (pdPASS != result) {
-        ESP_LOGW(TAG, "Queue full, losing frame"); // This should never happen
-        return true; // We will not process this frame, return it immediately
+        ESP_LOGW(TAG, "Queue full, losing frame"); 
+        return true; // Return true so the UVC driver immediately reuses this buffer
     }
-    return false; // We only passed the frame to Queue, so we must return false and call uvc_host_frame_return() later
+    return false; 
 }
 
 static void stream_callback(const uvc_host_stream_event_data_t *event, void *user_ctx)
@@ -80,18 +80,12 @@ static void stream_callback(const uvc_host_stream_event_data_t *event, void *use
         ESP_ERROR_CHECK(uvc_host_stream_close(event->device_disconnected.stream_hdl));
         break;
     case UVC_HOST_FRAME_BUFFER_OVERFLOW:
-        // The Frame was discarded because it exceeded the available frame buffer size.
-        // To resolve this, increase the `frame_size` parameter in `uvc_host_stream_config_t.advanced` to allocate a larger buffer.
         ESP_LOGW(TAG, "Frame buffer overflow");
         break;
     case UVC_HOST_FRAME_BUFFER_UNDERFLOW:
-        // The Frame was discarded because no available buffer was free for storage.
-        // To resolve this, either optimize your processing speed or increase the `number_of_frame_buffers` parameter in
-        // `uvc_host_stream_config_t.advanced` to allocate additional buffers.
         ESP_LOGW(TAG, "Frame buffer underflow");
         break;
     default:
-        abort();
         break;
     }
 }
@@ -99,7 +93,6 @@ static void stream_callback(const uvc_host_stream_event_data_t *event, void *use
 static void usb_lib_task(void *arg)
 {
     while (1) {
-        // Start handling system events
         uint32_t event_flags;
         usb_host_lib_handle_events(portMAX_DELAY, &event_flags);
         if (event_flags & USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS) {
@@ -107,7 +100,6 @@ static void usb_lib_task(void *arg)
         }
         if (event_flags & USB_HOST_LIB_EVENT_FLAGS_ALL_FREE) {
             ESP_LOGI(TAG, "USB: All devices freed");
-            // Continue handling USB events to allow device reconnection
         }
     }
 }
@@ -116,16 +108,13 @@ static void frame_handling_task(void *arg)
 {
     const uvc_host_stream_config_t *stream_config = (const uvc_host_stream_config_t *)arg;
     QueueHandle_t frame_q = *((QueueHandle_t *)(stream_config->user_ctx));  
-    // rx_frames_queue, as defined in stream_config.user_ctx
-    // creates local value frame_q to store a copy of rx_frames_queue
     
     while (true) {
         uvc_host_stream_hdl_t uvc_stream = NULL;
         ESP_LOGI(TAG, "Looking for UVC camera...");
         esp_err_t err = uvc_host_stream_open(stream_config, pdMS_TO_TICKS(5000), &uvc_stream);
         if (ESP_OK != err) {
-            ESP_LOGI(TAG, "Failed to open device");
-            vTaskDelay(pdMS_TO_TICKS(5000));
+            vTaskDelay(pdMS_TO_TICKS(2000));
             continue;
         }
         
@@ -135,17 +124,16 @@ static void frame_handling_task(void *arg)
         
         uvc_host_stream_start(uvc_stream);
         
-        // Main streaming loop
         while (dev_connected) {
             uvc_host_frame_t *frame;
-            if (xQueueReceive(frame_q, &frame, pdMS_TO_TICKS(5000)) == pdPASS) {
-                // ESP_LOGI(TAG, "New frame! Len: %d", frame->data_len);
+            if (xQueueReceive(frame_q, &frame, pdMS_TO_TICKS(1000)) == pdPASS) {
                 if (g_user_frame_callback != NULL) {
                     g_user_frame_callback(frame->data, frame->data_len, g_user_callback_ctx);
                 }
                 uvc_host_frame_return(uvc_stream, frame);
             }
         }
+        
         if (dev_connected) {
             ESP_LOGI(TAG, "Stream stop");
             uvc_host_stream_stop(uvc_stream);
@@ -158,7 +146,8 @@ static void frame_handling_task(void *arg)
 
 esp_err_t app_uvc_init(void)
 {
-    rx_frames_queue = xQueueCreate(3, sizeof(uvc_host_frame_t *));  //frame pointers
+    // OPTIMIZATION: Increased queue size from 3 to 10 to absorb Wi-Fi latency spikes
+    rx_frames_queue = xQueueCreate(10, sizeof(uvc_host_frame_t *));  
     assert(rx_frames_queue);
     
     ESP_LOGI(TAG, "Installing USB Host");
@@ -168,20 +157,20 @@ esp_err_t app_uvc_init(void)
     };
     ESP_ERROR_CHECK(usb_host_install(&host_config));
     
-    // Create a FreeRTOS task that will handle USB library events
-    BaseType_t task_created = xTaskCreate(usb_lib_task, "usb_lib", 4096, NULL, USB_HOST_PRIORITY, NULL);
+    BaseType_t task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_lib", 4096, NULL, USB_HOST_PRIORITY, NULL, 0);
     assert(task_created == pdTRUE);
     
     ESP_LOGI(TAG, "Installing UVC driver");
     const uvc_host_driver_config_t uvc_driver_config = {
         .driver_task_stack_size = 4 * 1024,
         .driver_task_priority = USB_HOST_PRIORITY + 1,
-        .xCoreID = tskNO_AFFINITY,
+        .xCoreID = 0, // Pin to core 0
         .create_background_task = true,
     };
     ESP_ERROR_CHECK(uvc_host_install(&uvc_driver_config));
     
-    task_created = xTaskCreate(frame_handling_task, "frame_hdl", 4096, (void *)&stream_config, USB_HOST_PRIORITY - 2, NULL);
+    // OPTIMIZATION: Increased priority to ensure frames are handled quickly
+    task_created = xTaskCreatePinnedToCore(frame_handling_task, "frame_hdl", 4096, (void *)&stream_config, USB_HOST_PRIORITY, NULL, 0);
     assert(task_created == pdTRUE);
 
     return ESP_OK;
@@ -190,13 +179,9 @@ esp_err_t app_uvc_init(void)
 esp_err_t app_uvc_register_frame_callback(uvc_frame_ready_cb_t frame_cb, void *user_ctx)
 {
     if (frame_cb == NULL) {
-        ESP_LOGE(TAG, "Frame callback cannot be NULL");
         return ESP_ERR_INVALID_ARG;
     }
-    
     g_user_frame_callback = frame_cb;
     g_user_callback_ctx = user_ctx;
-    
-    ESP_LOGI(TAG, "Frame callback registered");
     return ESP_OK;
 }
